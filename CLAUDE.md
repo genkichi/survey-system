@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-知的障害者向けアンケートシステム（にちようサークル）。
+知的障害者向けアンケートシステム。
 単一の `index.html` にHTML・CSS・JavaScriptをすべて内包したシングルファイル構成。
 
 ## 起動方法
