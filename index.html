@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>にちようサークル アンケート</title>
+  <style>
+    :root {
+      --amber:        #FF8F00;
+      --amber-light:  #FFE082;
+      --amber-pale:   #FFF8E1;
+      --bg-start:     #FFFDE7;
+      --bg-end:       #FFF3E0;
+      --text-dark:    #4E342E;
+      --text-mid:     #795548;
+      --accent:       #E65100;
+      --white:        #FFFFFF;
+      --shadow:       rgba(0,0,0,0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+    }
+
+    body {
+      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
+                   'Noto Sans JP', 'Meiryo', sans-serif;
+      background: linear-gradient(160deg, var(--bg-start), var(--bg-end));
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── スクリーン共通 ── */
+    .screen {
+      display: none;
+      min-height: 100vh;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 20px 40px;
+    }
+    .screen.active { display: flex; }
+
+    /* ── アニメーション ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+    @keyframes bounce {
+      from { transform: translateY(0);    }
+      to   { transform: translateY(-22px); }
+    }
+    @keyframes pop {
+      0%   { transform: scale(1);    }
+      40%  { transform: scale(0.93); }
+      100% { transform: scale(1);    }
+    }
+    .anim-fadeup {
+      animation: fadeUp 0.32s ease both;
+    }
+
+    /* ════════════════════════════
+       アンケート画面
+    ════════════════════════════ */
+
+    /* 進行ドット */
+    .progress-bar {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 36px;
+    }
+    .dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--amber-light);
+      border: 2.5px solid var(--amber);
+      transition: background 0.3s, transform 0.3s, border-color 0.3s;
+    }
+    .dot.done    { background: var(--amber); }
+    .dot.current {
+      background: var(--accent);
+      border-color: var(--accent);
+      transform: scale(1.45);
+    }
+
+    /* 質問番号 */
+    .q-number {
+      font-size: 1.05rem;
+      color: var(--text-mid);
+      font-weight: bold;
+      margin-bottom: 14px;
+      letter-spacing: 0.06em;
+    }
+
+    /* 質問テキスト */
+    .q-text {
+      font-size: clamp(1.7rem, 5.5vw, 2.3rem);
+      color: var(--text-dark);
+      text-align: center;
+      font-weight: bold;
+      line-height: 1.65;
+      margin-bottom: 38px;
+      max-width: 560px;
+    }
+
+    /* 選択肢リスト */
+    #choices {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+      max-width: 540px;
+    }
+
+    /* 選択肢ボタン */
+    .choice-btn {
+      display: flex;
+      align-items: center;
+      background: var(--white);
+      border: 3px solid var(--amber-light);
+      border-radius: 24px;
+      padding: 15px 22px;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      box-shadow: 0 4px 14px var(--shadow);
+      transition: transform 0.12s ease, background 0.12s ease,
+                  border-color 0.12s ease;
+    }
+    .choice-btn:active {
+      transform: scale(0.95);
+      background: var(--amber-pale);
+      border-color: var(--amber);
+      animation: pop 0.25s ease;
+    }
+    .choice-emoji {
+      font-size: 3.4rem;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-right: 18px;
+    }
+    .choice-label {
+      font-size: 1.35rem;
+      color: var(--text-dark);
+      font-weight: bold;
+      line-height: 1.3;
+    }
+
+    /* ════════════════════════════
+       ありがとう画面
+    ════════════════════════════ */
+    #thanks-screen {
+      background: linear-gradient(160deg, #E8F5E9, #F3E5F5);
+      gap: 0;
+    }
+    .thanks-emoji {
+      font-size: clamp(6rem, 20vw, 9rem);
+      margin-bottom: 20px;
+      animation: bounce 0.9s ease-in-out infinite alternate;
+    }
+    .thanks-title {
+      font-size: clamp(2.8rem, 10vw, 4.2rem);
+      color: #4A148C;
+      font-weight: bold;
+      text-align: center;
+    }
+    .thanks-sub {
+      font-size: 1.35rem;
+      color: #7B1FA2;
+      margin-top: 14px;
+      text-align: center;
+      line-height: 1.7;
+    }
+    .restart-btn {
+      margin-top: 52px;
+      background: var(--amber);
+      color: var(--white);
+      border: none;
+      border-radius: 24px;
+      padding: 20px 52px;
+      font-size: 1.4rem;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 5px 16px rgba(255,143,0,0.45);
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+    .restart-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 8px rgba(255,143,0,0.4);
+    }
+    /* 管理者リンク（目立たせない） */
+    .admin-hint {
+      margin-top: 32px;
+      font-size: 0.75rem;
+      color: #C5CAE9;
+      text-decoration: none;
+      opacity: 0.6;
+    }
+
+    /* ════════════════════════════
+       管理者画面
+    ════════════════════════════ */
+    #admin-screen {
+      background: #F5F5F5;
+      justify-content: flex-start;
+      align-items: stretch;
+      overflow-y: auto;
+      padding: 24px 16px 48px;
+    }
+    .adm-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .adm-title {
+      font-size: 1.55rem;
+      color: var(--text-dark);
+      font-weight: bold;
+    }
+    .adm-total {
+      font-size: 1.05rem;
+      color: var(--text-mid);
+      margin-bottom: 22px;
+    }
+
+    /* カードセクション */
+    .card {
+      background: var(--white);
+      border-radius: 18px;
+      padding: 20px 18px;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+    .card h2 {
+      font-size: 1.15rem;
+      color: var(--text-dark);
+      line-height: 1.45;
+      margin-bottom: 6px;
+    }
+    .card-avg {
+      font-size: 0.95rem;
+      color: var(--text-mid);
+      margin-bottom: 14px;
+    }
+
+    /* 棒グラフ行 */
+    .stat-row {
+      display: flex;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid #F0F0F0;
+      gap: 8px;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-emoji { font-size: 1.55rem; flex-shrink: 0; }
+    .stat-label-text {
+      font-size: 0.95rem;
+      color: var(--text-dark);
+      flex: 0 0 auto;
+      width: 9rem;
+    }
+    .stat-bar-wrap {
+      flex: 1;
+      background: #EEEEEE;
+      border-radius: 5px;
+      height: 12px;
+      overflow: hidden;
+    }
+    .stat-bar {
+      height: 100%;
+      background: var(--amber);
+      border-radius: 5px;
+      transition: width 0.6s ease;
+    }
+    .stat-count {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: var(--accent);
+      flex: 0 0 3rem;
+      text-align: right;
+    }
+
+    /* 最近の回答 */
+    .resp-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid #F0F0F0;
+      font-size: 0.9rem;
+      color: var(--text-mid);
+    }
+    .resp-row:last-child { border-bottom: none; }
+    .resp-emojis { font-size: 1.45rem; letter-spacing: 4px; }
+
+    /* アクションボタン */
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .btn {
+      padding: 12px 26px;
+      border-radius: 16px;
+      border: none;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.12s, opacity 0.12s;
+    }
+    .btn:active { transform: scale(0.95); opacity: 0.85; }
+    .btn-amber   { background: var(--amber); color: white; }
+    .btn-red     { background: #EF5350;      color: white; }
+    .btn-outline {
+      background: white;
+      color: var(--text-dark);
+      border: 2px solid #DDD;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════ アンケート画面 ════════ -->
+  <div id="survey-screen" class="screen active">
+    <div class="progress-bar" id="progress-bar"></div>
+    <div id="question-content" class="anim-fadeup">
+      <div class="q-number" id="q-number"></div>
+      <div class="q-text"   id="q-text"></div>
+      <div id="choices"></div>
+    </div>
+  </div>
+
+  <!-- ════════ ありがとう画面 ════════ -->
+  <div id="thanks-screen" class="screen">
+    <div class="thanks-emoji">🎉</div>
+    <div class="thanks-title">ありがとう！</div>
+    <div class="thanks-sub">こたえてくれて<br>ありがとうございました</div>
+    <button class="restart-btn" onclick="restart()">もういちど</button>
+    <a class="admin-hint" href="?admin">管理</a>
+  </div>
+
+  <!-- ════════ 管理者画面 ════════ -->
+  <div id="admin-screen" class="screen">
+    <div class="adm-header">
+      <div class="adm-title">📊 かんりがめん</div>
+      <button class="btn btn-outline" onclick="backToSurvey()">← アンケートへ</button>
+    </div>
+    <div id="adm-content"></div>
+  </div>
+
+  <script>
+    // ─────────────────────────────────────────
+    // 定数
+    // ─────────────────────────────────────────
+    const QUESTIONS = [
+      'きょうのかつどうは\nたのしかったですか？',
+      'またいきたいですか？',
+      'きょうは\nつかれましたか？',
+    ];
+
+    // score: 5=最高 … 1=最低（配列インデックス 0 が score 5）
+    // 質問ごとの選択肢（QUESTIONS と同じ順番）
+    const CHOICES = [
+      // Q1: きょうのかつどうは たのしかったですか？
+      [
+        { emoji: '😄', label: 'すごくたのしい',        score: 5 },
+        { emoji: '🙂', label: 'たのしい',              score: 4 },
+        { emoji: '😐', label: 'ふつう',                score: 3 },
+        { emoji: '🙁', label: 'あまりたのしくなかった', score: 2 },
+        { emoji: '😢', label: 'たのしくなかった',       score: 1 },
+      ],
+      // Q2: またいきたいですか？
+      [
+        { emoji: '😄', label: 'ぜったいいきたい',   score: 5 },
+        { emoji: '🙂', label: 'いきたい',           score: 4 },
+        { emoji: '😐', label: 'ふつう',             score: 3 },
+        { emoji: '🙁', label: 'あまりいきたくない', score: 2 },
+        { emoji: '😢', label: 'いきたくない',       score: 1 },
+      ],
+      // Q3: きょうは つかれましたか？
+      [
+        { emoji: '😄', label: 'ぜんぜんつかれていない', score: 5 },
+        { emoji: '🙂', label: 'あまりつかれていない',   score: 4 },
+        { emoji: '😐', label: 'ふつう',                 score: 3 },
+        { emoji: '🙁', label: 'すこしつかれた',         score: 2 },
+        { emoji: '😢', label: 'すごくつかれた',         score: 1 },
+      ],
+    ];
+
+    const STORAGE_KEY = 'nichiyo_survey_results';
+
+    // ─────────────────────────────────────────
+    // 状態
+    // ─────────────────────────────────────────
+    let currentQ   = 0;
+    let answers    = [];   // 各質問のスコア (1–5)
+    let busy       = false; // 二重タップ防止
+
+    // ─────────────────────────────────────────
+    // 初期化
+    // ─────────────────────────────────────────
+    function init() {
+      if (location.search.includes('admin')) {
+        showScreen('admin-screen');
+        renderAdmin();
+      } else {
+        showScreen('survey-screen');
+        renderQuestion(0);
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // アンケート
+    // ─────────────────────────────────────────
+    function renderQuestion(idx) {
+      currentQ = idx;
+
+      // 進行ドット生成（初回のみ）
+      const bar = document.getElementById('progress-bar');
+      if (bar.children.length !== QUESTIONS.length) {
+        bar.innerHTML = '';
+        QUESTIONS.forEach((_, i) => {
+          const d = document.createElement('div');
+          d.className = 'dot';
+          bar.appendChild(d);
+        });
+      }
+      bar.querySelectorAll('.dot').forEach((d, i) => {
+        d.className = 'dot' + (i < idx ? ' done' : i === idx ? ' current' : '');
+      });
+
+      // 質問番号
+      document.getElementById('q-number').textContent =
+        `しつもん ${idx + 1} / ${QUESTIONS.length}`;
+
+      // 質問テキスト
+      document.getElementById('q-text').innerHTML =
+        QUESTIONS[idx].replace('\n', '<br>');
+
+      // 選択肢ボタン
+      const choicesEl = document.getElementById('choices');
+      choicesEl.innerHTML = '';
+      CHOICES[idx].forEach(ch => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.innerHTML =
+          `<span class="choice-emoji">${ch.emoji}</span>` +
+          `<span class="choice-label">${ch.label}</span>`;
+        btn.addEventListener('click', () => onChoose(ch.score));
+        choicesEl.appendChild(btn);
+      });
+
+      // フェードアニメーション
+      const content = document.getElementById('question-content');
+      content.style.animation = 'none';
+      // reflow を強制してアニメーションをリセット
+      void content.offsetHeight;
+      content.style.animation = 'fadeUp 0.32s ease both';
+    }
+
+    function onChoose(score) {
+      if (busy) return;
+      busy = true;
+
+      answers.push(score);
+
+      setTimeout(() => {
+        if (currentQ < QUESTIONS.length - 1) {
+          renderQuestion(currentQ + 1);
+          busy = false;
+        } else {
+          saveResult();
+          showScreen('thanks-screen');
+          busy = false;
+        }
+      }, 220);
+    }
+
+    function restart() {
+      answers = [];
+      showScreen('survey-screen');
+      renderQuestion(0);
+    }
+
+    function backToSurvey() {
+      answers = [];
+      history.replaceState({}, '', location.pathname);
+      showScreen('survey-screen');
+      renderQuestion(0);
+    }
+
+    // ─────────────────────────────────────────
+    // ストレージ
+    // ─────────────────────────────────────────
+    function saveResult() {
+      const all = loadResults();
+      all.push({
+        date: new Date().toISOString(),
+        q1: answers[0],
+        q2: answers[1],
+        q3: answers[2],
+      });
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      } catch (e) {
+        // localStorage が使えない環境では無視
+      }
+    }
+
+    function loadResults() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // 管理者画面
+    // ─────────────────────────────────────────
+    function renderAdmin() {
+      const results = loadResults();
+      const el = document.getElementById('adm-content');
+
+      if (results.length === 0) {
+        el.innerHTML = `
+          <div class="card">
+            <p style="color:var(--text-mid);font-size:1.1rem;">
+              まだ回答がありません。
+            </p>
+          </div>`;
+        return;
+      }
+
+      let html = `<div class="adm-total">かいとうすう：<strong>${results.length} 件</strong></div>`;
+
+      // ── 質問ごとの集計 ──
+      QUESTIONS.forEach((q, qi) => {
+        const key = `q${qi + 1}`;
+
+        // counts[score-1] に件数を積む
+        const counts = [0, 0, 0, 0, 0];
+        let total = 0;
+        results.forEach(r => {
+          const s = r[key];
+          if (s >= 1 && s <= 5) { counts[s - 1]++; total += s; }
+        });
+        const avg = (total / results.length).toFixed(1);
+        const maxCount = Math.max(...counts, 1);
+
+        html += `<div class="card">`;
+        html += `<h2>Q${qi + 1}. ${q.replace('\n', ' ')}</h2>`;
+        html += `<div class="card-avg">へいきん: ${avg} / 5.0</div>`;
+
+        CHOICES[qi].forEach(c => {
+          const count = counts[c.score - 1];
+          const pct   = Math.round((count / maxCount) * 100);
+          html += `
+            <div class="stat-row">
+              <span class="stat-emoji">${c.emoji}</span>
+              <span class="stat-label-text">${c.label}</span>
+              <div class="stat-bar-wrap">
+                <div class="stat-bar" style="width:${pct}%"></div>
+              </div>
+              <span class="stat-count">${count}件</span>
+            </div>`;
+        });
+
+        html += `</div>`;
+      });
+
+      // ── 最近の回答（新しい順・最大30件）──
+      html += `<div class="card"><h2>さいきんのかいとう</h2>`;
+      results.slice(-30).reverse().forEach(r => {
+        const d = new Date(r.date);
+        const ds =
+          `${d.getMonth()+1}/${d.getDate()} ` +
+          `${String(d.getHours()).padStart(2,'0')}:` +
+          `${String(d.getMinutes()).padStart(2,'0')}`;
+        // score → emoji（各質問の選択肢配列から逆引き）
+        const emojis = [r.q1, r.q2, r.q3]
+          .map((s, qi) => (s >= 1 && s <= 5) ? CHOICES[qi][5 - s].emoji : '?')
+          .join(' ');
+        html += `
+          <div class="resp-row">
+            <span>${ds}</span>
+            <span class="resp-emojis">${emojis}</span>
+          </div>`;
+      });
+      html += `</div>`;
+
+      // ── アクションボタン ──
+      html += `
+        <div class="btn-row">
+          <button class="btn btn-amber"   onclick="exportCSV()">CSVでだす</button>
+          <button class="btn btn-red"     onclick="clearData()">データをけす</button>
+        </div>
+        <div style="height:32px"></div>`;
+
+      el.innerHTML = html;
+    }
+
+    function exportCSV() {
+      const results = loadResults();
+      if (results.length === 0) { alert('データがありません。'); return; }
+
+      const scoreToLabel = (s, qi) => (s >= 1 && s <= 5) ? CHOICES[qi][5 - s].label : '';
+      const BOM = '\uFEFF';
+      const header = '日時,Q1スコア,Q1回答,Q2スコア,Q2回答,Q3スコア,Q3回答\n';
+      const rows = results.map(r =>
+        `"${new Date(r.date).toLocaleString('ja-JP')}",` +
+        `${r.q1},"${scoreToLabel(r.q1, 0)}",` +
+        `${r.q2},"${scoreToLabel(r.q2, 1)}",` +
+        `${r.q3},"${scoreToLabel(r.q3, 2)}"`
+      ).join('\n');
+
+      const blob = new Blob([BOM + header + rows], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `survey_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function clearData() {
+      if (confirm('すべての回答データを削除しますか？\nこの操作は元に戻せません。')) {
+        localStorage.removeItem(STORAGE_KEY);
+        renderAdmin();
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // ユーティリティ
+    // ─────────────────────────────────────────
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // ─────────────────────────────────────────
+    // 起動
+    // ─────────────────────────────────────────
+    init();
+  </script>
+</body>
+</html>
