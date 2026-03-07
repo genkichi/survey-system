@@ -52,7 +52,29 @@
     .screen.active { display: flex; }
 
     /* ── アニメーション ── */
-    @keyframes fadeUp {
+    @keyframes toastInOut {
+      0%   { opacity: 0; transform: translateY(12px); }
+      15%  { opacity: 1; transform: translateY(0);    }
+      75%  { opacity: 1; transform: translateY(0);    }
+      100% { opacity: 0; transform: translateY(-8px); }
+    }
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2E7D32;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: bold;
+      padding: 12px 28px;
+      border-radius: 999px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+      pointer-events: none;
+      animation: toastInOut 2s ease forwards;
+      white-space: nowrap;
+      z-index: 9999;
+    }
       from { opacity: 0; transform: translateY(18px); }
       to   { opacity: 1; transform: translateY(0);    }
     }
@@ -762,7 +784,7 @@
       html += `
         <div class="btn-row">
           <button class="btn btn-amber"   onclick="applyConfig()">💾 保存する</button>
-          <button class="btn btn-outline" onclick="confirmResetConfig()">もとにもどす</button>
+          <button class="btn btn-outline" onclick="cancelConfig()">キャンセル</button>
         </div>
       </div>`;
 
@@ -808,6 +830,14 @@
       renderAdmin();
     }
 
+    function showToast(msg) {
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      t.addEventListener('animationend', () => t.remove());
+    }
+
     function applyConfig() {
       collectFormValues();
       QUESTIONS.forEach((q, qi) => {
@@ -819,13 +849,12 @@
       });
       saveConfig();
       renderAdmin();
+      showToast('✅ 保存しました！');
     }
 
-    function confirmResetConfig() {
-      if (confirm('設問をはじめの状態にもどしますか？')) {
-        resetConfig();
-        renderAdmin();
-      }
+    function cancelConfig() {
+      loadConfig();
+      renderAdmin();
     }
 
     function exportCSV() {
