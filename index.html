@@ -784,7 +784,7 @@
       html += `
         <div class="btn-row">
           <button class="btn btn-amber"   onclick="applyConfig()">💾 保存する</button>
-          <button class="btn btn-outline" onclick="confirmResetConfig()">もとにもどす</button>
+          <button class="btn btn-outline" onclick="cancelConfig()">キャンセル</button>
         </div>
       </div>`;
 
@@ -852,11 +852,9 @@
       showToast('✅ 保存しました！');
     }
 
-    function confirmResetConfig() {
-      if (confirm('設問をはじめの状態にもどしますか？')) {
-        resetConfig();
-        renderAdmin();
-      }
+    function cancelConfig() {
+      loadConfig();
+      renderAdmin();
     }
 
     function exportCSV() {
