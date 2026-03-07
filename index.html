@@ -386,7 +386,9 @@
       cursor: pointer;
       transition: transform 0.12s, opacity 0.12s;
     }
-    .btn:active { transform: scale(0.95); opacity: 0.85; }
+    .btn:active          { transform: scale(0.95); opacity: 0.85; }
+    .btn:disabled        { opacity: 0.35; cursor: default; }
+    .btn:disabled:active { transform: none; opacity: 1; }
     .btn-amber   { background: var(--amber); color: white; }
     .btn-red     { background: #EF5350;      color: white; }
     .btn-outline {
@@ -450,10 +452,6 @@
 
   <!-- ════════ 管理者画面 ════════ -->
   <div id="admin-screen" class="screen">
-    <div class="adm-header">
-      <div class="adm-title">📊 かんりがめん</div>
-      <button class="btn btn-outline" onclick="backToSurvey()">← アンケートへ</button>
-    </div>
     <div id="adm-content"></div>
   </div>
 
@@ -500,8 +498,10 @@
     let QUESTIONS = QUESTIONS_DEFAULT.slice();
     let CHOICES   = CHOICES_DEFAULT.map(q => q.map(c => ({ ...c })));
 
-    const STORAGE_KEY = 'nichiyo_survey_results';
-    const CONFIG_KEY  = 'nichiyo_survey_config';
+    const STORAGE_KEY = 'nichiyo_survey_results'; // マイグレーション用（旧キー）
+    const CONFIG_KEY  = 'nichiyo_survey_config';  // マイグレーション用（旧キー）
+    const SURVEYS_KEY = 'nichiyo_surveys';
+    const ACTIVE_KEY  = 'nichiyo_active_survey';
 
     // ─────────────────────────────────────────
     // 状態
@@ -510,32 +510,100 @@
     let answers    = [];   // 各質問のスコア (1–5)
     let busy       = false; // 二重タップ防止
 
+    let surveys        = [];      // アンケート配列
+    let activeSurveyId = null;    // 表示中アンケートID
+    let editingSurveyId = null;   // 詳細ビューで開いているアンケートID
+    let adminView      = 'list';  // 'list' | 'detail'
+
     // ─────────────────────────────────────────
-    // 設問設定の保存・読み込み
+    // ストレージ（複数アンケート）
     // ─────────────────────────────────────────
-    function loadConfig() {
+    function loadSurveys() {
       try {
-        const cfg = JSON.parse(localStorage.getItem(CONFIG_KEY));
-        if (cfg && Array.isArray(cfg.questions) && Array.isArray(cfg.choices)) {
-          QUESTIONS = cfg.questions;
-          CHOICES   = cfg.choices;
+        const raw = localStorage.getItem(SURVEYS_KEY);
+        if (raw) {
+          surveys = JSON.parse(raw);
+        } else {
+          // マイグレーション：旧データを「アンケート 1」として取り込む
+          const firstSurvey = {
+            id:        String(Date.now()),
+            name:      'アンケート 1',
+            createdAt: new Date().toISOString(),
+            questions: QUESTIONS_DEFAULT.slice(),
+            choices:   CHOICES_DEFAULT.map(q => q.map(c => ({ ...c }))),
+            results:   [],
+          };
+          const oldConfig = localStorage.getItem(CONFIG_KEY);
+          if (oldConfig) {
+            try {
+              const cfg = JSON.parse(oldConfig);
+              if (Array.isArray(cfg.questions)) firstSurvey.questions = cfg.questions;
+              if (Array.isArray(cfg.choices))   firstSurvey.choices   = cfg.choices;
+            } catch {}
+          }
+          const oldResults = localStorage.getItem(STORAGE_KEY);
+          if (oldResults) {
+            try {
+              const res = JSON.parse(oldResults);
+              if (Array.isArray(res)) firstSurvey.results = res;
+            } catch {}
+          }
+          surveys = [firstSurvey];
+          saveSurveys();
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem(CONFIG_KEY);
         }
-      } catch {}
+      } catch {
+        surveys = [];
+      }
+      // 表示中アンケートIDの解決
+      activeSurveyId = localStorage.getItem(ACTIVE_KEY);
+      if (!surveys.find(s => s.id === activeSurveyId)) {
+        activeSurveyId = surveys[0]?.id ?? null;
+        if (activeSurveyId) localStorage.setItem(ACTIVE_KEY, activeSurveyId);
+      }
     }
 
-    function saveConfig() {
-      try {
-        localStorage.setItem(CONFIG_KEY, JSON.stringify({
-          questions: QUESTIONS,
-          choices:   CHOICES,
-        }));
-      } catch {}
+    function saveSurveys() {
+      try { localStorage.setItem(SURVEYS_KEY, JSON.stringify(surveys)); } catch {}
     }
 
-    function resetConfig() {
-      localStorage.removeItem(CONFIG_KEY);
-      QUESTIONS = QUESTIONS_DEFAULT.slice();
-      CHOICES   = CHOICES_DEFAULT.map(q => q.map(c => ({ ...c })));
+    function getActiveSurvey()  { return surveys.find(s => s.id === activeSurveyId) ?? null; }
+    function getEditingSurvey() { return surveys.find(s => s.id === editingSurveyId) ?? null; }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function createSurvey(name) {
+      const survey = {
+        id:        String(Date.now()),
+        name:      name,
+        createdAt: new Date().toISOString(),
+        questions: QUESTIONS_DEFAULT.slice(),
+        choices:   CHOICES_DEFAULT.map(q => q.map(c => ({ ...c }))),
+        results:   [],
+      };
+      surveys.push(survey);
+      saveSurveys();
+      return survey;
+    }
+
+    function setActiveSurvey(id) {
+      activeSurveyId = id;
+      localStorage.setItem(ACTIVE_KEY, id);
+    }
+
+    // 表示中アンケートの設問・選択肢をグローバル変数に展開
+    function loadConfig() {
+      const s = getActiveSurvey();
+      if (s) {
+        QUESTIONS = s.questions.slice();
+        CHOICES   = s.choices.map(q => q.map(c => ({ ...c })));
+      } else {
+        QUESTIONS = QUESTIONS_DEFAULT.slice();
+        CHOICES   = CHOICES_DEFAULT.map(q => q.map(c => ({ ...c })));
+      }
     }
 
     // 選択肢の絵文字・スコアを位置に応じて自動再割り当て
@@ -563,14 +631,18 @@
     // 初期化
     // ─────────────────────────────────────────
     function init() {
+      loadSurveys();
       loadConfig();
       if (location.search.includes('admin')) {
+        adminView = 'list';
+        editingSurveyId = null;
         showScreen('admin-screen');
         renderAdmin();
       } else {
         showScreen('start-screen');
       }
       document.getElementById('start-btn').addEventListener('click', function() {
+        loadConfig();
         showScreen('survey-screen');
         renderQuestion(0);
       });
@@ -654,106 +726,146 @@
       showScreen('start-screen');
     }
 
-    // ─────────────────────────────────────────
-    // ストレージ
-    // ─────────────────────────────────────────
     function saveResult() {
-      const all = loadResults();
+      const s = getActiveSurvey();
+      if (!s) return;
       const result = { date: new Date().toISOString() };
-      answers.forEach((s, i) => { result[`q${i + 1}`] = s; });
-      all.push(result);
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-      } catch (e) {
-        // localStorage が使えない環境では無視
-      }
-    }
-
-    function loadResults() {
-      try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      } catch {
-        return [];
-      }
+      answers.forEach((score, i) => { result[`q${i + 1}`] = score; });
+      s.results.push(result);
+      saveSurveys();
     }
 
     // ─────────────────────────────────────────
     // 管理者画面
     // ─────────────────────────────────────────
     function renderAdmin() {
-      const results = loadResults();
-      const el = document.getElementById('adm-content');
+      document.getElementById('adm-content').innerHTML =
+        adminView === 'list' ? renderSurveyList() : renderSurveyDetail();
+    }
 
-      let html = '';
+    // ── ビュー A：アンケート一覧 ──
+    function renderSurveyList() {
+      let html = `
+        <div class="adm-header">
+          <div class="adm-title">📋 アンケート一覧</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-amber" onclick="onCreateSurvey()">＋ 新しいアンケート</button>
+            <button class="btn btn-outline" onclick="backToSurvey()">← アンケートへ</button>
+          </div>
+        </div>`;
+
+      if (surveys.length === 0) {
+        return html + `<div class="card"><p style="color:var(--text-mid)">アンケートがありません。</p></div>`;
+      }
+
+      surveys.forEach(s => {
+        const isActive = s.id === activeSurveyId;
+        const d = new Date(s.createdAt);
+        const dateStr = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+        html += `
+          <div class="card" style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span style="font-size:1.1rem;font-weight:bold;color:var(--text-dark);flex:1">${escHtml(s.name)}</span>
+              ${isActive
+                ? `<span style="background:#E8F5E9;color:#2E7D32;padding:4px 12px;border-radius:999px;font-size:0.85rem;font-weight:bold;">▶ 表示中</span>`
+                : `<button class="btn btn-outline" style="padding:6px 14px;font-size:0.85rem" onclick="onSetActive('${s.id}')">つかう</button>`
+              }
+            </div>
+            <div style="font-size:0.9rem;color:var(--text-mid);">
+              ${s.results.length} 件の回答 ・ 作成日 ${dateStr}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-outline" style="padding:8px 18px;font-size:0.9rem"
+                      onclick="onOpenDetail('${s.id}')">詳細 →</button>
+              <button class="btn btn-red" style="padding:8px 18px;font-size:0.9rem"
+                      onclick="onDeleteSurvey('${s.id}')"
+                      ${isActive ? 'disabled' : ''}>削除</button>
+            </div>
+          </div>`;
+      });
+
+      return html;
+    }
+
+    // ── ビュー B：アンケート詳細（結果＋設問編集） ──
+    function renderSurveyDetail() {
+      const s = getEditingSurvey();
+      if (!s) { adminView = 'list'; return renderSurveyList(); }
+
+      // グローバルを編集中アンケートに同期
+      QUESTIONS = s.questions.slice();
+      CHOICES   = s.choices.map(q => q.map(c => ({ ...c })));
+
+      const results = s.results;
+      let html = `
+        <div class="adm-header">
+          <div class="adm-title">📝 ${escHtml(s.name)}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-outline" onclick="onBackToList()">← 一覧へ</button>
+            <button class="btn btn-outline" onclick="backToSurvey()">← アンケートへ</button>
+          </div>
+        </div>`;
 
       if (results.length === 0) {
-        html += `
-          <div class="card">
-            <p style="color:var(--text-mid);font-size:1.1rem;">
-              まだ回答がありません。
-            </p>
-          </div>`;
+        html += `<div class="card"><p style="color:var(--text-mid);font-size:1.1rem;">まだ回答がありません。</p></div>`;
       } else {
         html += `<div class="adm-total">かいとうすう：<strong>${results.length} 件</strong></div>`;
 
-      // ── 質問ごとの集計 ──
-      QUESTIONS.forEach((q, qi) => {
-        const key = `q${qi + 1}`;
+        // ── 質問ごとの集計 ──
+        QUESTIONS.forEach((q, qi) => {
+          const key = `q${qi + 1}`;
+          const n = CHOICES[qi].length;
+          const counts = Array(n).fill(0);
+          let total = 0;
+          results.forEach(r => {
+            const sc = r[key];
+            if (sc >= 1 && sc <= n) { counts[sc - 1]++; total += sc; }
+          });
+          const avg = (total / results.length).toFixed(1);
+          const maxCount = Math.max(...counts, 1);
 
-        // counts[score-1] に件数を積む
-        const n = CHOICES[qi].length;
-        const counts = Array(n).fill(0);
-        let total = 0;
-        results.forEach(r => {
-          const s = r[key];
-          if (s >= 1 && s <= n) { counts[s - 1]++; total += s; }
+          html += `<div class="card">`;
+          html += `<h2>Q${qi + 1}. ${q.replace('\n', ' ')}</h2>`;
+          html += `<div class="card-avg">へいきん: ${avg} / ${n}.0</div>`;
+
+          CHOICES[qi].forEach(c => {
+            const count = counts[c.score - 1];
+            const pct   = Math.round((count / maxCount) * 100);
+            html += `
+              <div class="stat-row">
+                <span class="stat-emoji">${c.emoji}</span>
+                <span class="stat-label-text">${c.label}</span>
+                <div class="stat-bar-wrap">
+                  <div class="stat-bar" style="width:${pct}%"></div>
+                </div>
+                <span class="stat-count">${count}件</span>
+              </div>`;
+          });
+
+          html += `</div>`;
         });
-        const avg = (total / results.length).toFixed(1);
-        const maxCount = Math.max(...counts, 1);
 
-        html += `<div class="card">`;
-        html += `<h2>Q${qi + 1}. ${q.replace('\n', ' ')}</h2>`;
-        html += `<div class="card-avg">へいきん: ${avg} / ${n}.0</div>`;
-
-        CHOICES[qi].forEach(c => {
-          const count = counts[c.score - 1];
-          const pct   = Math.round((count / maxCount) * 100);
+        // ── 最近の回答（新しい順・最大30件）──
+        html += `<div class="card"><h2>さいきんのかいとう</h2>`;
+        results.slice(-30).reverse().forEach(r => {
+          const d = new Date(r.date);
+          const ds =
+            `${d.getMonth()+1}/${d.getDate()} ` +
+            `${String(d.getHours()).padStart(2,'0')}:` +
+            `${String(d.getMinutes()).padStart(2,'0')}`;
+          const emojis = QUESTIONS.map((_, qi) => {
+            const sc = r[`q${qi + 1}`];
+            const nc = CHOICES[qi].length;
+            return (sc >= 1 && sc <= nc) ? CHOICES[qi][nc - sc].emoji : '?';
+          }).join(' ');
           html += `
-            <div class="stat-row">
-              <span class="stat-emoji">${c.emoji}</span>
-              <span class="stat-label-text">${c.label}</span>
-              <div class="stat-bar-wrap">
-                <div class="stat-bar" style="width:${pct}%"></div>
-              </div>
-              <span class="stat-count">${count}件</span>
+            <div class="resp-row">
+              <span>${ds}</span>
+              <span class="resp-emojis">${emojis}</span>
             </div>`;
         });
-
         html += `</div>`;
-      });
-
-      // ── 最近の回答（新しい順・最大30件）──
-      html += `<div class="card"><h2>さいきんのかいとう</h2>`;
-      results.slice(-30).reverse().forEach(r => {
-        const d = new Date(r.date);
-        const ds =
-          `${d.getMonth()+1}/${d.getDate()} ` +
-          `${String(d.getHours()).padStart(2,'0')}:` +
-          `${String(d.getMinutes()).padStart(2,'0')}`;
-        // score → emoji（各質問の選択肢配列から逆引き）
-        const emojis = QUESTIONS.map((_, qi) => {
-          const s = r[`q${qi + 1}`];
-          const nc = CHOICES[qi].length;
-          return (s >= 1 && s <= nc) ? CHOICES[qi][nc - s].emoji : '?';
-        }).join(' ');
-        html += `
-          <div class="resp-row">
-            <span>${ds}</span>
-            <span class="resp-emojis">${emojis}</span>
-          </div>`;
-      });
-      html += `</div>`;
-      } // end if (results.length > 0)
+      }
 
       // ── 設問編集 ──
       html += `<div class="card"><h2>✏️ 設問を編集</h2>`;
@@ -765,14 +877,14 @@
           <button class="btn-sm btn-sm-red" onclick="removeQuestion(${qi})"
                   ${canDeleteQ ? '' : 'disabled'}>× 削除</button>
         </div>`;
-        html += `<textarea class="edit-q-text" data-qi="${qi}">${q.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`;
+        html += `<textarea class="edit-q-text" data-qi="${qi}">${escHtml(q)}</textarea>`;
         const canDeleteC = CHOICES[qi].length > 2;
         CHOICES[qi].forEach((c, ci) => {
           html += `
             <div class="edit-choice-row">
               <span class="edit-choice-emoji">${c.emoji}</span>
               <input class="edit-choice-label" data-qi="${qi}" data-ci="${ci}"
-                     value="${c.label.replace(/"/g,'&quot;')}">
+                     value="${escHtml(c.label)}">
               <button class="btn-sm btn-sm-red" onclick="removeChoice(${qi},${ci})"
                       ${canDeleteC ? '' : 'disabled'}>×</button>
             </div>`;
@@ -796,7 +908,7 @@
         </div>
         <div style="height:32px"></div>`;
 
-      el.innerHTML = html;
+      return html;
     }
 
     function addQuestion() {
@@ -847,32 +959,45 @@
         });
         reassignChoices(qi);
       });
-      saveConfig();
+      const s = getEditingSurvey();
+      if (s) {
+        s.questions = QUESTIONS.slice();
+        s.choices   = CHOICES.map(q => q.map(c => ({ ...c })));
+        if (s.id === activeSurveyId) loadConfig();
+      }
+      saveSurveys();
       renderAdmin();
       showToast('✅ 保存しました！');
     }
 
     function cancelConfig() {
-      loadConfig();
+      const s = getEditingSurvey();
+      if (s) {
+        QUESTIONS = s.questions.slice();
+        CHOICES   = s.choices.map(q => q.map(c => ({ ...c })));
+      }
       renderAdmin();
     }
 
     function exportCSV() {
-      const results = loadResults();
-      if (results.length === 0) { alert('データがありません。'); return; }
+      const s = getEditingSurvey();
+      if (!s || s.results.length === 0) { alert('データがありません。'); return; }
 
-      const scoreToLabel = (s, qi) => {
-        const nc = CHOICES[qi].length;
-        return (s >= 1 && s <= nc) ? CHOICES[qi][nc - s].label : '';
+      const results   = s.results;
+      const questions = s.questions;
+      const choices   = s.choices;
+      const scoreToLabel = (score, qi) => {
+        const nc = choices[qi].length;
+        return (score >= 1 && score <= nc) ? choices[qi][nc - score].label : '';
       };
       const BOM = '\uFEFF';
       const header = '日時,' +
-        QUESTIONS.map((_, qi) => `Q${qi + 1}スコア,Q${qi + 1}回答`).join(',') + '\n';
+        questions.map((_, qi) => `Q${qi + 1}スコア,Q${qi + 1}回答`).join(',') + '\n';
       const rows = results.map(r =>
         `"${new Date(r.date).toLocaleString('ja-JP')}"` +
-        QUESTIONS.map((_, qi) => {
-          const s = r[`q${qi + 1}`];
-          return `,${ s ?? ''},"${scoreToLabel(s, qi)}"`;
+        questions.map((_, qi) => {
+          const score = r[`q${qi + 1}`];
+          return `,${ score ?? ''},"${scoreToLabel(score, qi)}"`;
         }).join('')
       ).join('\n');
 
@@ -880,16 +1005,58 @@
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `survey_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `survey_${s.name.replace(/\s/g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     }
 
     function clearData() {
-      if (confirm('すべての回答データを削除しますか？\nこの操作は元に戻せません。')) {
-        localStorage.removeItem(STORAGE_KEY);
+      if (confirm('このアンケートのすべての回答データを削除しますか？\nこの操作は元に戻せません。')) {
+        const s = getEditingSurvey();
+        if (s) { s.results = []; saveSurveys(); }
         renderAdmin();
       }
+    }
+
+    // ─────────────────────────────────────────
+    // 一覧操作ハンドラ
+    // ─────────────────────────────────────────
+    function onCreateSurvey() {
+      const name = prompt('アンケート名を入力してください', `アンケート ${surveys.length + 1}`);
+      if (name === null) return;
+      createSurvey(name.trim() || `アンケート ${surveys.length + 1}`);
+      renderAdmin();
+      showToast('✅ アンケートを作成しました！');
+    }
+
+    function onSetActive(id) {
+      setActiveSurvey(id);
+      loadConfig();
+      renderAdmin();
+      showToast('✅ アンケートを切り替えました！');
+    }
+
+    function onOpenDetail(id) {
+      editingSurveyId = id;
+      adminView = 'detail';
+      renderAdmin();
+    }
+
+    function onBackToList() {
+      editingSurveyId = null;
+      adminView = 'list';
+      renderAdmin();
+    }
+
+    function onDeleteSurvey(id) {
+      if (id === activeSurveyId) { alert('表示中のアンケートは削除できません。'); return; }
+      const survey = surveys.find(s => s.id === id);
+      if (!survey) return;
+      if (!confirm(`「${survey.name}」を削除しますか？\nこの操作は元に戻せません。`)) return;
+      surveys = surveys.filter(s => s.id !== id);
+      saveSurveys();
+      renderAdmin();
+      showToast('🗑 削除しました');
     }
 
     // ─────────────────────────────────────────
