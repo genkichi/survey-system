@@ -462,6 +462,7 @@
     const QUESTIONS_DEFAULT = [
       'きょうのかつどうは\nたのしかったですか？',
       'またいきたいですか？',
+      'ランチは\nどうでしたか？',
       'きょうは\nつかれましたか？',
     ];
 
@@ -484,7 +485,15 @@
         { emoji: '🙁', label: 'あまりいきたくない', score: 2 },
         { emoji: '😢', label: 'いきたくない',       score: 1 },
       ],
-      // Q3: きょうは つかれましたか？
+      // Q3: ランチはどうでしたか？
+      [
+        { emoji: '😄', label: 'すごくおいしかった', score: 5 },
+        { emoji: '🙂', label: 'おいしかった',       score: 4 },
+        { emoji: '😐', label: 'ふつう',             score: 3 },
+        { emoji: '🙁', label: 'あまりおいしくなかった', score: 2 },
+        { emoji: '😢', label: 'おいしくなかった',   score: 1 },
+      ],
+      // Q4: きょうは つかれましたか？
       [
         { emoji: '😄', label: 'ぜんぜんつかれていない', score: 5 },
         { emoji: '🙂', label: 'あまりつかれていない',   score: 4 },
