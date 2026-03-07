@@ -786,6 +786,8 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-outline" style="padding:8px 18px;font-size:0.9rem"
                       onclick="onOpenDetail('${s.id}')">詳細 →</button>
+              <button class="btn btn-outline" style="padding:8px 18px;font-size:0.9rem"
+                      onclick="onRenameSurvey('${s.id}')">名前を変更</button>
               <button class="btn btn-red" style="padding:8px 18px;font-size:0.9rem"
                       onclick="onDeleteSurvey('${s.id}')"
                       ${isActive ? 'disabled' : ''}>削除</button>
@@ -1068,6 +1070,17 @@
       editingSurveyId = null;
       adminView = 'list';
       renderAdmin();
+    }
+
+    function onRenameSurvey(id) {
+      const survey = surveys.find(s => s.id === id);
+      if (!survey) return;
+      const name = prompt('アンケート名を入力してください', survey.name);
+      if (name === null) return;
+      survey.name = name.trim() || survey.name;
+      saveSurveys();
+      renderAdmin();
+      showToast('✅ 名前を変更しました！');
     }
 
     function onDeleteSurvey(id) {
