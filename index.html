@@ -915,6 +915,7 @@
       html += `
         <div class="btn-row">
           <button class="btn btn-amber"   onclick="exportCSV()">CSVでだす</button>
+          <button class="btn btn-outline" onclick="shareSurvey()">共有</button>
           <button class="btn btn-red"     onclick="clearData()">データをけす</button>
         </div>
         <div style="height:32px"></div>`;
@@ -1001,6 +1002,36 @@
         CHOICES   = s.choices.map(q => q.map(c => ({ ...c })));
       }
       renderAdmin();
+    }
+
+    async function shareSurvey() {
+      const s = getEditingSurvey();
+      if (!s) return;
+      if (s.results.length === 0) { alert('データがありません。'); return; }
+
+      const lines = [`📋 ${s.name}`, `回答数: ${s.results.length} 件`, ''];
+      s.questions.forEach((q, qi) => {
+        const nc = s.choices[qi].length;
+        const scores = s.results.map(r => r[`q${qi + 1}`]).filter(sc => sc >= 1 && sc <= nc);
+        const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : '-';
+        lines.push(`Q${qi + 1} ${q}：平均 ${avg}`);
+      });
+      const text = lines.join('\n');
+
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: s.name, text });
+        } catch (e) {
+          if (e.name !== 'AbortError') { alert('共有に失敗しました。'); }
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast('📋 クリップボードにコピーしました！');
+        } catch {
+          alert(text);
+        }
+      }
     }
 
     function exportCSV() {
