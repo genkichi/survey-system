@@ -38,3 +38,13 @@ URL に `?admin` を付けるとアクセスできる。
 - `counts[score - 1]` でスコアを件数配列にマッピングする（score=1 → index 0）
 - 二重タップ防止のため `busy` フラグを 220ms 保持する
 - CSV エクスポートは BOM 付き UTF-8（Excel の文字化け対策）
+
+## 管理者画面の機能
+
+| 機能 | 関数 | 説明 |
+|---|---|---|
+| アンケート作成 | `onCreateSurvey()` | `prompt()` で名前を入力して新規作成 |
+| アンケート名変更 | `onRenameSurvey(id)` | `prompt()` で既存の名前を編集 |
+| アンケート削除 | `onDeleteSurvey(id)` | 表示中のアンケートは削除不可 |
+| 有効化 | `onSetActive(id)` | 回答画面に表示するアンケートを切替 |
+| 詳細表示 | `onOpenDetail(id)` | 結果・設問編集ビューへ遷移 |
