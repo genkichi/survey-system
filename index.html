@@ -209,6 +209,47 @@
     }
 
     /* ════════════════════════════
+       スタート画面
+    ════════════════════════════ */
+    #start-screen {
+      background: linear-gradient(160deg, #fff9e6 0%, #ffe0b2 100%);
+      gap: 0;
+    }
+    .start-emoji {
+      font-size: clamp(5rem, 18vw, 8rem);
+      margin-bottom: 0.4em;
+      animation: bounce 1.6s ease-in-out infinite alternate;
+    }
+    .start-title {
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      font-weight: 900;
+      color: #5d3a00;
+      text-align: center;
+      line-height: 1.4;
+      margin-bottom: 0.5em;
+    }
+    .start-sub {
+      font-size: clamp(1.1rem, 3.5vw, 1.6rem);
+      color: #7b5200;
+      text-align: center;
+      line-height: 1.6;
+      margin-bottom: 1.8em;
+    }
+    .start-btn {
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      font-weight: 800;
+      padding: 0.7em 2.2em;
+      border-radius: 999px;
+      border: none;
+      background: #f9a825;
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(249,168,37,0.45);
+      cursor: pointer;
+      transition: transform 0.12s;
+    }
+    .start-btn:active { transform: scale(0.94); }
+
+    /* ════════════════════════════
        管理者画面
     ════════════════════════════ */
     #admin-screen {
@@ -335,8 +376,16 @@
 </head>
 <body>
 
+  <!-- ════════ スタート画面 ════════ -->
+  <div id="start-screen" class="screen active">
+    <div class="start-emoji">📋</div>
+    <h1 class="start-title">アンケートに<br>こたえよう！</h1>
+    <p class="start-sub">みんなのきもちを<br>おしえてください 😊</p>
+    <button class="start-btn" id="start-btn">はじめる</button>
+  </div>
+
   <!-- ════════ アンケート画面 ════════ -->
-  <div id="survey-screen" class="screen active">
+  <div id="survey-screen" class="screen">
     <div class="progress-bar" id="progress-bar"></div>
     <div id="question-content" class="anim-fadeup">
       <div class="q-number" id="q-number"></div>
@@ -419,9 +468,12 @@
         showScreen('admin-screen');
         renderAdmin();
       } else {
+        showScreen('start-screen');
+      }
+      document.getElementById('start-btn').addEventListener('click', function() {
         showScreen('survey-screen');
         renderQuestion(0);
-      }
+      });
     }
 
     // ─────────────────────────────────────────
@@ -493,15 +545,13 @@
 
     function restart() {
       answers = [];
-      showScreen('survey-screen');
-      renderQuestion(0);
+      showScreen('start-screen');
     }
 
     function backToSurvey() {
       answers = [];
       history.replaceState({}, '', location.pathname);
-      showScreen('survey-screen');
-      renderQuestion(0);
+      showScreen('start-screen');
     }
 
     // ─────────────────────────────────────────
