@@ -372,6 +372,21 @@
       color: var(--text-dark);
       border: 2px solid #DDD;
     }
+
+    /* ── 設問編集フォーム ── */
+    .edit-q-block   { margin-bottom: 24px; }
+    .edit-q-label   { font-size: 0.9rem; color: var(--text-mid); font-weight: bold;
+                      margin-bottom: 6px; }
+    .edit-q-text    { width: 100%; min-height: 72px; border: 1.5px solid #DDD;
+                      border-radius: 10px; padding: 10px; font-size: 1rem;
+                      font-family: inherit; resize: vertical; margin-bottom: 8px; }
+    .edit-choice-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+    .edit-choice-emoji { font-size: 1.6rem; flex-shrink: 0; }
+    .edit-choice-label { flex: 1; border: 1.5px solid #DDD; border-radius: 8px;
+                         padding: 8px 12px; font-size: 0.95rem; font-family: inherit; }
+    .edit-q-text:focus, .edit-choice-label:focus {
+      outline: none; border-color: var(--amber);
+    }
   </style>
 </head>
 <body>
@@ -414,9 +429,9 @@
 
   <script>
     // ─────────────────────────────────────────
-    // 定数
+    // 定数（デフォルト値）
     // ─────────────────────────────────────────
-    const QUESTIONS = [
+    const QUESTIONS_DEFAULT = [
       'きょうのかつどうは\nたのしかったですか？',
       'またいきたいですか？',
       'きょうは\nつかれましたか？',
@@ -424,7 +439,7 @@
 
     // score: 5=最高 … 1=最低（配列インデックス 0 が score 5）
     // 質問ごとの選択肢（QUESTIONS と同じ順番）
-    const CHOICES = [
+    const CHOICES_DEFAULT = [
       // Q1: きょうのかつどうは たのしかったですか？
       [
         { emoji: '😄', label: 'すごくたのしい',        score: 5 },
@@ -451,7 +466,12 @@
       ],
     ];
 
+    // カスタマイズ可能な設問・選択肢（起動時に localStorage から上書き）
+    let QUESTIONS = QUESTIONS_DEFAULT.slice();
+    let CHOICES   = CHOICES_DEFAULT.map(q => q.map(c => ({ ...c })));
+
     const STORAGE_KEY = 'nichiyo_survey_results';
+    const CONFIG_KEY  = 'nichiyo_survey_config';
 
     // ─────────────────────────────────────────
     // 状態
@@ -461,9 +481,38 @@
     let busy       = false; // 二重タップ防止
 
     // ─────────────────────────────────────────
+    // 設問設定の保存・読み込み
+    // ─────────────────────────────────────────
+    function loadConfig() {
+      try {
+        const cfg = JSON.parse(localStorage.getItem(CONFIG_KEY));
+        if (cfg && Array.isArray(cfg.questions) && Array.isArray(cfg.choices)) {
+          QUESTIONS = cfg.questions;
+          CHOICES   = cfg.choices;
+        }
+      } catch {}
+    }
+
+    function saveConfig() {
+      try {
+        localStorage.setItem(CONFIG_KEY, JSON.stringify({
+          questions: QUESTIONS,
+          choices:   CHOICES,
+        }));
+      } catch {}
+    }
+
+    function resetConfig() {
+      localStorage.removeItem(CONFIG_KEY);
+      QUESTIONS = QUESTIONS_DEFAULT.slice();
+      CHOICES   = CHOICES_DEFAULT.map(q => q.map(c => ({ ...c })));
+    }
+
+    // ─────────────────────────────────────────
     // 初期化
     // ─────────────────────────────────────────
     function init() {
+      loadConfig();
       if (location.search.includes('admin')) {
         showScreen('admin-screen');
         renderAdmin();
@@ -654,6 +703,29 @@
       });
       html += `</div>`;
 
+      // ── 設問編集 ──
+      html += `<div class="card"><h2>✏️ 設問を編集</h2>`;
+      QUESTIONS.forEach((q, qi) => {
+        html += `<div class="edit-q-block">`;
+        html += `<div class="edit-q-label">Q${qi + 1} 設問テキスト</div>`;
+        html += `<textarea class="edit-q-text" data-qi="${qi}">${q.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`;
+        CHOICES[qi].forEach((c, ci) => {
+          html += `
+            <div class="edit-choice-row">
+              <span class="edit-choice-emoji">${c.emoji}</span>
+              <input class="edit-choice-label" data-qi="${qi}" data-ci="${ci}"
+                     value="${c.label.replace(/"/g,'&quot;')}">
+            </div>`;
+        });
+        html += `</div>`;
+      });
+      html += `
+        <div class="btn-row">
+          <button class="btn btn-amber"   onclick="applyConfig()">💾 保存する</button>
+          <button class="btn btn-outline" onclick="confirmResetConfig()">もとにもどす</button>
+        </div>
+      </div>`;
+
       // ── アクションボタン ──
       html += `
         <div class="btn-row">
@@ -663,6 +735,26 @@
         <div style="height:32px"></div>`;
 
       el.innerHTML = html;
+    }
+
+    function applyConfig() {
+      document.querySelectorAll('.edit-q-text').forEach(el => {
+        const qi = +el.dataset.qi;
+        QUESTIONS[qi] = el.value.trim() || QUESTIONS_DEFAULT[qi];
+      });
+      document.querySelectorAll('.edit-choice-label').forEach(el => {
+        const qi = +el.dataset.qi, ci = +el.dataset.ci;
+        CHOICES[qi][ci].label = el.value.trim() || CHOICES_DEFAULT[qi][ci].label;
+      });
+      saveConfig();
+      renderAdmin();
+    }
+
+    function confirmResetConfig() {
+      if (confirm('設問をはじめの状態にもどしますか？')) {
+        resetConfig();
+        renderAdmin();
+      }
     }
 
     function exportCSV() {
