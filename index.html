@@ -915,6 +915,7 @@
       collectFormValues();
       QUESTIONS.push('あたらしいせつもん');
       CHOICES.push(CHOICES_DEFAULT[0].map(c => ({ ...c })));
+      syncEditingSurvey();
       renderAdmin();
     }
 
@@ -924,6 +925,7 @@
       collectFormValues();
       QUESTIONS.splice(qi, 1);
       CHOICES.splice(qi, 1);
+      syncEditingSurvey();
       renderAdmin();
     }
 
@@ -931,6 +933,7 @@
       collectFormValues();
       CHOICES[qi].push({ emoji: '😢', label: 'あたらしいせんたくし', score: 1 });
       reassignChoices(qi);
+      syncEditingSurvey();
       renderAdmin();
     }
 
@@ -939,7 +942,17 @@
       collectFormValues();
       CHOICES[qi].splice(ci, 1);
       reassignChoices(qi);
+      syncEditingSurvey();
       renderAdmin();
+    }
+
+    // 編集中の QUESTIONS/CHOICES をアンケートオブジェクトへ書き戻す（未保存・一時同期）
+    function syncEditingSurvey() {
+      const s = getEditingSurvey();
+      if (s) {
+        s.questions = QUESTIONS.slice();
+        s.choices   = CHOICES.map(q => q.map(c => ({ ...c })));
+      }
     }
 
     function showToast(msg) {
