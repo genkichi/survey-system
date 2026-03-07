@@ -462,6 +462,7 @@
     const QUESTIONS_DEFAULT = [
       'きょうのかつどうは\nたのしかったですか？',
       'またいきたいですか？',
+      'ランチは\nどうでしたか？',
       'きょうは\nつかれましたか？',
     ];
 
@@ -484,7 +485,15 @@
         { emoji: '🙁', label: 'あまりいきたくない', score: 2 },
         { emoji: '😢', label: 'いきたくない',       score: 1 },
       ],
-      // Q3: きょうは つかれましたか？
+      // Q3: ランチはどうでしたか？
+      [
+        { emoji: '😄', label: 'すごくおいしかった', score: 5 },
+        { emoji: '🙂', label: 'おいしかった',       score: 4 },
+        { emoji: '😐', label: 'ふつう',             score: 3 },
+        { emoji: '🙁', label: 'あまりおいしくなかった', score: 2 },
+        { emoji: '😢', label: 'おいしくなかった',   score: 1 },
+      ],
+      // Q4: きょうは つかれましたか？
       [
         { emoji: '😄', label: 'ぜんぜんつかれていない', score: 5 },
         { emoji: '🙂', label: 'あまりつかれていない',   score: 4 },
@@ -777,6 +786,8 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-outline" style="padding:8px 18px;font-size:0.9rem"
                       onclick="onOpenDetail('${s.id}')">詳細 →</button>
+              <button class="btn btn-outline" style="padding:8px 18px;font-size:0.9rem"
+                      onclick="onRenameSurvey('${s.id}')">名前を変更</button>
               <button class="btn btn-red" style="padding:8px 18px;font-size:0.9rem"
                       onclick="onDeleteSurvey('${s.id}')"
                       ${isActive ? 'disabled' : ''}>削除</button>
@@ -1059,6 +1070,17 @@
       editingSurveyId = null;
       adminView = 'list';
       renderAdmin();
+    }
+
+    function onRenameSurvey(id) {
+      const survey = surveys.find(s => s.id === id);
+      if (!survey) return;
+      const name = prompt('アンケート名を入力してください', survey.name);
+      if (name === null) return;
+      survey.name = name.trim() || survey.name;
+      saveSurveys();
+      renderAdmin();
+      showToast('✅ 名前を変更しました！');
     }
 
     function onDeleteSurvey(id) {
