@@ -374,6 +374,14 @@
     }
 
     /* ── 設問編集フォーム ── */
+    .edit-q-header  { display: flex; justify-content: space-between; align-items: center;
+                      margin-bottom: 6px; }
+    .btn-sm         { padding: 5px 12px; font-size: 0.8rem; border-radius: 8px; border: none;
+                      cursor: pointer; font-weight: bold; transition: transform 0.12s; }
+    .btn-sm:active  { transform: scale(0.95); }
+    .btn-sm:disabled { opacity: 0.35; cursor: default; }
+    .btn-sm-red     { background: #FFEBEE; color: #C62828; }
+    .btn-sm-add     { background: #E8F5E9; color: #2E7D32; }
     .edit-q-block   { margin-bottom: 24px; }
     .edit-q-label   { font-size: 0.9rem; color: var(--text-mid); font-weight: bold;
                       margin-bottom: 6px; }
@@ -508,6 +516,27 @@
       CHOICES   = CHOICES_DEFAULT.map(q => q.map(c => ({ ...c })));
     }
 
+    // 選択肢の絵文字・スコアを位置に応じて自動再割り当て
+    const EMOJI_PALETTE = ['😄', '🙂', '😐', '🙁', '😢'];
+    function reassignChoices(qi) {
+      const n = CHOICES[qi].length;
+      CHOICES[qi].forEach((c, i) => {
+        c.score = n - i;
+        const ei = n === 1 ? 2 : Math.round(i / (n - 1) * (EMOJI_PALETTE.length - 1));
+        c.emoji = EMOJI_PALETTE[ei];
+      });
+    }
+
+    // 編集フォームの現在値を QUESTIONS/CHOICES に収集
+    function collectFormValues() {
+      document.querySelectorAll('.edit-q-text').forEach(el => {
+        QUESTIONS[+el.dataset.qi] = el.value;
+      });
+      document.querySelectorAll('.edit-choice-label').forEach(el => {
+        CHOICES[+el.dataset.qi][+el.dataset.ci].label = el.value;
+      });
+    }
+
     // ─────────────────────────────────────────
     // 初期化
     // ─────────────────────────────────────────
@@ -608,12 +637,9 @@
     // ─────────────────────────────────────────
     function saveResult() {
       const all = loadResults();
-      all.push({
-        date: new Date().toISOString(),
-        q1: answers[0],
-        q2: answers[1],
-        q3: answers[2],
-      });
+      const result = { date: new Date().toISOString() };
+      answers.forEach((s, i) => { result[`q${i + 1}`] = s; });
+      all.push(result);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
       } catch (e) {
@@ -636,35 +662,36 @@
       const results = loadResults();
       const el = document.getElementById('adm-content');
 
+      let html = '';
+
       if (results.length === 0) {
-        el.innerHTML = `
+        html += `
           <div class="card">
             <p style="color:var(--text-mid);font-size:1.1rem;">
               まだ回答がありません。
             </p>
           </div>`;
-        return;
-      }
-
-      let html = `<div class="adm-total">かいとうすう：<strong>${results.length} 件</strong></div>`;
+      } else {
+        html += `<div class="adm-total">かいとうすう：<strong>${results.length} 件</strong></div>`;
 
       // ── 質問ごとの集計 ──
       QUESTIONS.forEach((q, qi) => {
         const key = `q${qi + 1}`;
 
         // counts[score-1] に件数を積む
-        const counts = [0, 0, 0, 0, 0];
+        const n = CHOICES[qi].length;
+        const counts = Array(n).fill(0);
         let total = 0;
         results.forEach(r => {
           const s = r[key];
-          if (s >= 1 && s <= 5) { counts[s - 1]++; total += s; }
+          if (s >= 1 && s <= n) { counts[s - 1]++; total += s; }
         });
         const avg = (total / results.length).toFixed(1);
         const maxCount = Math.max(...counts, 1);
 
         html += `<div class="card">`;
         html += `<h2>Q${qi + 1}. ${q.replace('\n', ' ')}</h2>`;
-        html += `<div class="card-avg">へいきん: ${avg} / 5.0</div>`;
+        html += `<div class="card-avg">へいきん: ${avg} / ${n}.0</div>`;
 
         CHOICES[qi].forEach(c => {
           const count = counts[c.score - 1];
@@ -692,9 +719,11 @@
           `${String(d.getHours()).padStart(2,'0')}:` +
           `${String(d.getMinutes()).padStart(2,'0')}`;
         // score → emoji（各質問の選択肢配列から逆引き）
-        const emojis = [r.q1, r.q2, r.q3]
-          .map((s, qi) => (s >= 1 && s <= 5) ? CHOICES[qi][5 - s].emoji : '?')
-          .join(' ');
+        const emojis = QUESTIONS.map((_, qi) => {
+          const s = r[`q${qi + 1}`];
+          const nc = CHOICES[qi].length;
+          return (s >= 1 && s <= nc) ? CHOICES[qi][nc - s].emoji : '?';
+        }).join(' ');
         html += `
           <div class="resp-row">
             <span>${ds}</span>
@@ -702,23 +731,34 @@
           </div>`;
       });
       html += `</div>`;
+      } // end if (results.length > 0)
 
       // ── 設問編集 ──
       html += `<div class="card"><h2>✏️ 設問を編集</h2>`;
       QUESTIONS.forEach((q, qi) => {
+        const canDeleteQ = QUESTIONS.length > 1;
         html += `<div class="edit-q-block">`;
-        html += `<div class="edit-q-label">Q${qi + 1} 設問テキスト</div>`;
+        html += `<div class="edit-q-header">
+          <div class="edit-q-label">Q${qi + 1} 設問テキスト</div>
+          <button class="btn-sm btn-sm-red" onclick="removeQuestion(${qi})"
+                  ${canDeleteQ ? '' : 'disabled'}>× 削除</button>
+        </div>`;
         html += `<textarea class="edit-q-text" data-qi="${qi}">${q.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`;
+        const canDeleteC = CHOICES[qi].length > 2;
         CHOICES[qi].forEach((c, ci) => {
           html += `
             <div class="edit-choice-row">
               <span class="edit-choice-emoji">${c.emoji}</span>
               <input class="edit-choice-label" data-qi="${qi}" data-ci="${ci}"
                      value="${c.label.replace(/"/g,'&quot;')}">
+              <button class="btn-sm btn-sm-red" onclick="removeChoice(${qi},${ci})"
+                      ${canDeleteC ? '' : 'disabled'}>×</button>
             </div>`;
         });
+        html += `<button class="btn-sm btn-sm-add" onclick="addChoice(${qi})" style="margin-top:6px">＋ 選択肢を追加</button>`;
         html += `</div>`;
       });
+      html += `<button class="btn-sm btn-sm-add" onclick="addQuestion()" style="margin-bottom:14px">＋ 設問を追加</button>`;
       html += `
         <div class="btn-row">
           <button class="btn btn-amber"   onclick="applyConfig()">💾 保存する</button>
@@ -737,14 +777,45 @@
       el.innerHTML = html;
     }
 
+    function addQuestion() {
+      collectFormValues();
+      QUESTIONS.push('あたらしいせつもん');
+      CHOICES.push(CHOICES_DEFAULT[0].map(c => ({ ...c })));
+      renderAdmin();
+    }
+
+    function removeQuestion(qi) {
+      if (QUESTIONS.length <= 1) return;
+      if (!confirm(`Q${qi + 1} を削除しますか？\n保存済みの回答データとの対応がずれる場合があります。`)) return;
+      collectFormValues();
+      QUESTIONS.splice(qi, 1);
+      CHOICES.splice(qi, 1);
+      renderAdmin();
+    }
+
+    function addChoice(qi) {
+      collectFormValues();
+      CHOICES[qi].push({ emoji: '😢', label: 'あたらしいせんたくし', score: 1 });
+      reassignChoices(qi);
+      renderAdmin();
+    }
+
+    function removeChoice(qi, ci) {
+      if (CHOICES[qi].length <= 2) return;
+      collectFormValues();
+      CHOICES[qi].splice(ci, 1);
+      reassignChoices(qi);
+      renderAdmin();
+    }
+
     function applyConfig() {
-      document.querySelectorAll('.edit-q-text').forEach(el => {
-        const qi = +el.dataset.qi;
-        QUESTIONS[qi] = el.value.trim() || QUESTIONS_DEFAULT[qi];
-      });
-      document.querySelectorAll('.edit-choice-label').forEach(el => {
-        const qi = +el.dataset.qi, ci = +el.dataset.ci;
-        CHOICES[qi][ci].label = el.value.trim() || CHOICES_DEFAULT[qi][ci].label;
+      collectFormValues();
+      QUESTIONS.forEach((q, qi) => {
+        if (!q.trim()) QUESTIONS[qi] = QUESTIONS_DEFAULT[qi] || 'せつもん';
+        CHOICES[qi].forEach((c, ci) => {
+          if (!c.label.trim()) c.label = CHOICES_DEFAULT[qi]?.[ci]?.label || 'せんたくし';
+        });
+        reassignChoices(qi);
       });
       saveConfig();
       renderAdmin();
@@ -761,14 +832,19 @@
       const results = loadResults();
       if (results.length === 0) { alert('データがありません。'); return; }
 
-      const scoreToLabel = (s, qi) => (s >= 1 && s <= 5) ? CHOICES[qi][5 - s].label : '';
+      const scoreToLabel = (s, qi) => {
+        const nc = CHOICES[qi].length;
+        return (s >= 1 && s <= nc) ? CHOICES[qi][nc - s].label : '';
+      };
       const BOM = '\uFEFF';
-      const header = '日時,Q1スコア,Q1回答,Q2スコア,Q2回答,Q3スコア,Q3回答\n';
+      const header = '日時,' +
+        QUESTIONS.map((_, qi) => `Q${qi + 1}スコア,Q${qi + 1}回答`).join(',') + '\n';
       const rows = results.map(r =>
-        `"${new Date(r.date).toLocaleString('ja-JP')}",` +
-        `${r.q1},"${scoreToLabel(r.q1, 0)}",` +
-        `${r.q2},"${scoreToLabel(r.q2, 1)}",` +
-        `${r.q3},"${scoreToLabel(r.q3, 2)}"`
+        `"${new Date(r.date).toLocaleString('ja-JP')}"` +
+        QUESTIONS.map((_, qi) => {
+          const s = r[`q${qi + 1}`];
+          return `,${ s ?? ''},"${scoreToLabel(s, qi)}"`;
+        }).join('')
       ).join('\n');
 
       const blob = new Blob([BOM + header + rows], { type: 'text/csv;charset=utf-8;' });
