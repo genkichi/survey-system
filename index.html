@@ -75,6 +75,7 @@
       white-space: nowrap;
       z-index: 9999;
     }
+    @keyframes fadeUp {
       from { opacity: 0; transform: translateY(18px); }
       to   { opacity: 1; transform: translateY(0);    }
     }
@@ -683,7 +684,7 @@
 
       // 質問テキスト
       document.getElementById('q-text').innerHTML =
-        QUESTIONS[idx].replace('\n', '<br>');
+        QUESTIONS[idx].replaceAll('\n', '<br>');
 
       // 選択肢ボタン
       const choicesEl = document.getElementById('choices');
@@ -691,9 +692,13 @@
       CHOICES[idx].forEach(ch => {
         const btn = document.createElement('button');
         btn.className = 'choice-btn';
-        btn.innerHTML =
-          `<span class="choice-emoji">${ch.emoji}</span>` +
-          `<span class="choice-label">${ch.label}</span>`;
+        const emojiEl = document.createElement('span');
+        emojiEl.className = 'choice-emoji';
+        emojiEl.textContent = ch.emoji;
+        const labelEl = document.createElement('span');
+        labelEl.className = 'choice-label';
+        labelEl.textContent = ch.label;
+        btn.append(emojiEl, labelEl);
         btn.addEventListener('click', () => onChoose(ch.score));
         choicesEl.appendChild(btn);
       });
@@ -836,7 +841,7 @@
           const maxCount = Math.max(...counts, 1);
 
           html += `<div class="card">`;
-          html += `<h2>Q${qi + 1}. ${q.replace('\n', ' ')}</h2>`;
+          html += `<h2>Q${qi + 1}. ${q.replaceAll('\n', ' ')}</h2>`;
           html += `<div class="card-avg">へいきん: ${avg} / ${n}.0</div>`;
 
           CHOICES[qi].forEach(c => {
@@ -845,7 +850,7 @@
             html += `
               <div class="stat-row">
                 <span class="stat-emoji">${c.emoji}</span>
-                <span class="stat-label-text">${c.label}</span>
+                <span class="stat-label-text">${escHtml(c.label)}</span>
                 <div class="stat-bar-wrap">
                   <div class="stat-bar" style="width:${pct}%"></div>
                 </div>
@@ -996,11 +1001,8 @@
     }
 
     function cancelConfig() {
-      const s = getEditingSurvey();
-      if (s) {
-        QUESTIONS = s.questions.slice();
-        CHOICES   = s.choices.map(q => q.map(c => ({ ...c })));
-      }
+      loadSurveys();
+      loadConfig();
       renderAdmin();
     }
 
