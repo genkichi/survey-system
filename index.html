@@ -525,6 +525,60 @@
     let editingSurveyId = null;   // 詳細ビューで開いているアンケートID
     let adminView      = 'list';  // 'list' | 'detail'
 
+    let audioCtx = null; // Web Audio API コンテキスト
+
+    // ─────────────────────────────────────────
+    // 音のフィードバック
+    // ─────────────────────────────────────────
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    // 単音を鳴らす内部ヘルパー
+    function playTone(freq, startTime, duration, gainPeak) {
+      const ctx  = getAudioCtx();
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(gainPeak, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    }
+
+    // 選択肢タップ時：軽いポン音
+    function playSoundChoice() {
+      try { playTone(660, getAudioCtx().currentTime, 0.12, 0.25); } catch {}
+    }
+
+    // はじめるボタン時：上昇アルペジオ（ラ・ド・ミ・ラ）
+    function playSoundStart() {
+      try {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        playTone(440, now,        0.12, 0.20); // ラ
+        playTone(523, now + 0.09, 0.12, 0.22); // ド
+        playTone(659, now + 0.18, 0.12, 0.25); // ミ
+        playTone(880, now + 0.27, 0.30, 0.30); // ラ（高）
+      } catch {}
+    }
+
+    // アンケート完了時：明るい上昇和音（ド・ミ・ソ）
+    function playSoundComplete() {
+      try {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        playTone(523, now,        0.25, 0.25); // ド
+        playTone(659, now + 0.12, 0.25, 0.25); // ミ
+        playTone(784, now + 0.24, 0.35, 0.30); // ソ
+      } catch {}
+    }
+
     // ─────────────────────────────────────────
     // ストレージ（複数アンケート）
     // ─────────────────────────────────────────
@@ -652,6 +706,7 @@
         showScreen('start-screen');
       }
       document.getElementById('start-btn').addEventListener('click', function() {
+        playSoundStart();
         loadConfig();
         showScreen('survey-screen');
         renderQuestion(0);
@@ -715,6 +770,7 @@
       if (busy) return;
       busy = true;
 
+      playSoundChoice();
       answers.push(score);
 
       setTimeout(() => {
@@ -723,6 +779,7 @@
           busy = false;
         } else {
           saveResult();
+          playSoundComplete();
           showScreen('thanks-screen');
           busy = false;
         }
