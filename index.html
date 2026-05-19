@@ -200,6 +200,79 @@
     }
 
     /* ════════════════════════════
+       確認画面
+    ════════════════════════════ */
+    #confirm-screen {
+      background: linear-gradient(160deg, #fff9e6 0%, #ffe0b2 100%);
+      justify-content: flex-start;
+      align-items: center;
+      overflow-y: auto;
+      padding-top: 40px;
+      gap: 0;
+    }
+    .confirm-title {
+      font-size: clamp(1.6rem, 5vw, 2.2rem);
+      font-weight: bold;
+      color: var(--text-dark);
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .confirm-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 540px;
+    }
+    .confirm-item {
+      background: var(--white);
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 3px 10px var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .confirm-item-emoji { font-size: 2.8rem; flex-shrink: 0; }
+    .confirm-item-texts { display: flex; flex-direction: column; gap: 4px; }
+    .confirm-item-q {
+      font-size: 0.9rem;
+      color: var(--text-mid);
+    }
+    .confirm-item-label {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: var(--text-dark);
+    }
+    .confirm-btn-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin-top: 28px;
+      margin-bottom: 40px;
+      width: 100%;
+      max-width: 540px;
+    }
+    .confirm-ok-btn {
+      background: #43A047;
+      color: var(--white);
+      border: none;
+      border-radius: 24px;
+      padding: 18px 0;
+      font-size: 1.4rem;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 5px 16px rgba(67,160,71,0.40);
+      transition: transform 0.12s, box-shadow 0.12s;
+      width: 100%;
+    }
+    .confirm-ok-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 8px rgba(67,160,71,0.35);
+    }
+
+    /* ════════════════════════════
        ありがとう画面
     ════════════════════════════ */
     #thanks-screen {
@@ -462,13 +535,22 @@
     </div>
   </div>
 
+  <!-- ════════ 確認画面 ════════ -->
+  <div id="confirm-screen" class="screen">
+    <div class="confirm-title">📋 かくにんしてください</div>
+    <div class="confirm-list" id="confirm-list"></div>
+    <div class="confirm-btn-row">
+      <button class="confirm-ok-btn" onclick="onConfirm()">✓ これでいいです</button>
+      <button class="back-btn" style="align-self:center;" onclick="onBackFromConfirm()">◀ もどる</button>
+    </div>
+  </div>
+
   <!-- ════════ ありがとう画面 ════════ -->
   <div id="thanks-screen" class="screen">
     <div class="thanks-emoji">🎉</div>
     <div class="thanks-title">ありがとう！</div>
     <div class="thanks-sub">こたえてくれて<br>ありがとうございました</div>
-    <button class="back-btn" style="align-self:center; margin-top:40px;" onclick="onBackFromThanks()">◀ もどる</button>
-    <button class="restart-btn" style="margin-top:16px;" onclick="restart()">もういちど</button>
+    <button class="restart-btn" onclick="restart()">もういちど</button>
     <a class="admin-hint" href="?admin">管理</a>
   </div>
 
@@ -804,9 +886,9 @@
           // 次の設問の表示直後も 400ms 間タップを無効化（連続誤タップ防止）
           setTimeout(() => { busy = false; }, 400);
         } else {
-          saveResult();
-          playSoundComplete();
-          showScreen('thanks-screen');
+          // 最終設問後は確認画面へ（saveResult はまだ呼ばない）
+          renderConfirm();
+          showScreen('confirm-screen');
           busy = false;
         }
       }, 220);
@@ -820,16 +902,38 @@
       setTimeout(() => { busy = false; }, 400);
     }
 
-    function onBackFromThanks() {
-      // saveResult() で保存済みの直近回答を取り消す
-      const s = getActiveSurvey();
-      if (s && s.results.length > 0) {
-        s.results.pop();
-        saveSurveys();
-      }
+    function renderConfirm() {
+      const list = document.getElementById('confirm-list');
+      list.innerHTML = '';
+      QUESTIONS.forEach((q, qi) => {
+        const score  = answers[qi];
+        const nc     = CHOICES[qi].length;
+        const choice = (score >= 1 && score <= nc) ? CHOICES[qi][nc - score] : null;
+        const item   = document.createElement('div');
+        item.className = 'confirm-item';
+        item.innerHTML =
+          `<span class="confirm-item-emoji">${choice ? choice.emoji : '？'}</span>` +
+          `<div class="confirm-item-texts">` +
+          `<span class="confirm-item-q">Q${qi + 1}. ${q.replaceAll('\n', ' ')}</span>` +
+          `<span class="confirm-item-label">${choice ? choice.label : '-'}</span>` +
+          `</div>`;
+        list.appendChild(item);
+      });
+    }
+
+    function onConfirm() {
+      if (busy) return;
+      busy = true;
+      saveResult();
+      playSoundComplete();
+      showScreen('thanks-screen');
+      busy = false;
+    }
+
+    function onBackFromConfirm() {
       answers.pop(); // 最後の設問の回答を取り消し
-      showScreen('survey-screen');
       renderQuestion(QUESTIONS.length - 1);
+      showScreen('survey-screen');
     }
 
     function restart() {
