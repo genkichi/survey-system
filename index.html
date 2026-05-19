@@ -96,6 +96,25 @@
        アンケート画面
     ════════════════════════════ */
 
+    /* 戻るボタン */
+    .back-btn {
+      align-self: flex-start;
+      background: transparent;
+      border: 2.5px solid var(--amber-light);
+      border-radius: 14px;
+      padding: 9px 20px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--text-mid);
+      cursor: pointer;
+      transition: background 0.12s, transform 0.12s;
+      margin-bottom: 8px;
+    }
+    .back-btn:active {
+      background: var(--amber-pale);
+      transform: scale(0.95);
+    }
+
     /* 進行ドット */
     .progress-bar {
       display: flex;
@@ -434,6 +453,7 @@
 
   <!-- ════════ アンケート画面 ════════ -->
   <div id="survey-screen" class="screen">
+    <button id="back-btn" class="back-btn" onclick="onBack()">◀ もどる</button>
     <div class="progress-bar" id="progress-bar"></div>
     <div id="question-content" class="anim-fadeup">
       <div class="q-number" id="q-number"></div>
@@ -758,6 +778,10 @@
         choicesEl.appendChild(btn);
       });
 
+      // 戻るボタンの表示制御（Q1 では非表示・スペースは確保）
+      const backBtn = document.getElementById('back-btn');
+      if (backBtn) backBtn.style.visibility = idx === 0 ? 'hidden' : 'visible';
+
       // フェードアニメーション
       const content = document.getElementById('question-content');
       content.style.animation = 'none';
@@ -776,7 +800,8 @@
       setTimeout(() => {
         if (currentQ < QUESTIONS.length - 1) {
           renderQuestion(currentQ + 1);
-          busy = false;
+          // 次の設問の表示直後も 400ms 間タップを無効化（連続誤タップ防止）
+          setTimeout(() => { busy = false; }, 400);
         } else {
           saveResult();
           playSoundComplete();
@@ -784,6 +809,14 @@
           busy = false;
         }
       }, 220);
+    }
+
+    function onBack() {
+      if (busy || currentQ === 0) return;
+      busy = true;
+      answers.pop(); // 前の設問の回答を取り消し
+      renderQuestion(currentQ - 1);
+      setTimeout(() => { busy = false; }, 400);
     }
 
     function restart() {
