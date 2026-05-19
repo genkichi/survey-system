@@ -467,7 +467,8 @@
     <div class="thanks-emoji">🎉</div>
     <div class="thanks-title">ありがとう！</div>
     <div class="thanks-sub">こたえてくれて<br>ありがとうございました</div>
-    <button class="restart-btn" onclick="restart()">もういちど</button>
+    <button class="back-btn" style="align-self:center; margin-top:40px;" onclick="onBackFromThanks()">◀ もどる</button>
+    <button class="restart-btn" style="margin-top:16px;" onclick="restart()">もういちど</button>
     <a class="admin-hint" href="?admin">管理</a>
   </div>
 
@@ -817,6 +818,18 @@
       answers.pop(); // 前の設問の回答を取り消し
       renderQuestion(currentQ - 1);
       setTimeout(() => { busy = false; }, 400);
+    }
+
+    function onBackFromThanks() {
+      // saveResult() で保存済みの直近回答を取り消す
+      const s = getActiveSurvey();
+      if (s && s.results.length > 0) {
+        s.results.pop();
+        saveSurveys();
+      }
+      answers.pop(); // 最後の設問の回答を取り消し
+      showScreen('survey-screen');
+      renderQuestion(QUESTIONS.length - 1);
     }
 
     function restart() {
